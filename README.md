@@ -166,3 +166,8 @@ GNU AGPLv3
 ## Author
 
 * [BohwaZ](https://bohwaz.net/)
+
+## Fork
+
+Includes GitHub action to build Docker image.
+
