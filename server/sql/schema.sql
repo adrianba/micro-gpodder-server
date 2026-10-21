@@ -29,10 +29,12 @@ CREATE UNIQUE INDEX episodes_unique ON episodes (feed, media_url);
 CREATE TABLE users (
 	id INTEGER NOT NULL PRIMARY KEY,
 	name TEXT NOT NULL,
-	password TEXT NOT NULL
+	password TEXT NOT NULL,
+	token TEXT NULL,
+	external_user_id INTEGER NULL
 );
 
-CREATE UNIQUE INDEX users_name ON users (name);
+CREATE UNIQUE INDEX users_unique ON users (name, external_user_id);
 
 CREATE TABLE devices (
 	id INTEGER NOT NULL PRIMARY KEY,
@@ -71,5 +73,3 @@ CREATE TABLE episodes_actions (
 
 CREATE INDEX episodes_idx ON episodes_actions (user, action, changed);
 CREATE INDEX episodes_actions_link ON episodes_actions (episode);
-
-PRAGMA user_version = 20240428;

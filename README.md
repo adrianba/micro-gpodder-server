@@ -20,6 +20,7 @@ Requires PHP 7.4+ and SQLite3 with JSON1 extension.
 * Self-registration
 * See subscriptions and history on web interface
 * Fetch feeds and episodes metadata and store them locally (optional)
+* Can be used as an app inside [KaraDAV](https://fossil.kd2.org/karadav/) (alternative WebDAV server with support for NextCloud clients)
 
 ## Roadmap
 
@@ -30,16 +31,16 @@ Requires PHP 7.4+ and SQLite3 with JSON1 extension.
 
 ## Screenshots
 
-<img src="https://github.com/kd2org/opodsync/assets/584819/016b835d-2afe-47ef-86f0-dd8acc51aa89" height=300 /> <img src="https://github.com/kd2org/opodsync/assets/584819/45da98da-ded1-44b3-9607-c114c3fd7dbc" height=300 />
+<img src="scr1.png" height=300 /> <img src="scr2.png" height=300 /> <img src="scr3.png" height=300 />
 
 ## Installation
 
-Just copy the files from the `server` directory into a new directory of your webserver.
+Just copy the files from the `server` directory into a new directory of your webserver, and point a virtual host to this directory (using `DocumentRoot` in Apache).
 
 This should work in most cases. Exceptions are:
 
-* If you are not using Apache, but Caddy, or nginx, make sure to adapt the rules from the `.htaccess` file to your own server.
-* If you are using Apache, but have set-up this server in a sub-folder of your document root, then you will have to adapt the `.htaccess` to your configuration.
+* If you are not using Apache, but Caddy, or nginx, make sure to adapt the rules from the `.htaccess` file to your own server. This is untested.
+* If you are using Apache, but have set-up this server in a sub-folder of your document root, then you will have to adapt the `.htaccess` to your configuration and set `BASE_URL` correctly in `config.local.php` (see below). This is also untested.
 
 ### First account
 
@@ -51,35 +52,16 @@ If you want to allow more accounts, you'll have to configure the server (see "Co
 
 ### Docker
 
-See [Docker Hub](https://hub.docker.com/search?q=opodsync) to find community distribution for Docker. Please don't report Docker issues here, this repository is only for software development.
+ * [billznn/opodsync_dckr](https://hub.docker.com/r/billznn/opodsync_dckr): downloads from oPodSync upstream when building the container (not forking) ([Source](https://github.com/mzannoni/opodsync_dckr))
+ * [ganeshlab/opodsync](https://hub.docker.com/r/ganeshlab/opodsync): fork with Dockerfile ([Source](https://github.com/ganeshlab/opodsync))
+
+If these images stop being maintained, see [Docker Hub](https://hub.docker.com/search?q=opodsync) to find other community distribution for Docker.
+
+**Please don't report Docker issues here, this repository is only for software development.**
 
 ### Configuration
 
-You can create a `config.local.php` in the `data` directory (overridable with the `DATA_ROOT` environment variable), defining configuration constants:
-
-```
-<?php
-
-// Enable or disable subscriptions (boolean)
-// By default the server allows to create one account
-// and then disables subscriptions
-const ENABLE_SUBSCRIPTIONS = true;
-
-// Set to a file path to enable the debug log
-// Set to NULL (default) to disable the debug log
-const DEBUG = __DIR__ . '/debug.log';
-
-// Set to change the instance name
-const TITLE = 'My awesome GPodder server';
-
-// Set to the URL where the server is hosted
-const BASE_URL = 'https://gpodder.mydomain.tld/me/';
-
-// Set this to TRUE to forbid users from updating feed metadata,
-// as this may add some load on your server
-// (default is FALSE)
-const DISABLE_USER_METADATA_UPDATE = true;
-```
+You can copy the `config.dist.php` to `data/config.local.php`, and edit it to suit your needs.
 
 ### Fetching and updating feeds metadata
 
@@ -110,7 +92,7 @@ gPodder (the [desktop client](https://gpodder.github.io), not the gpodder.net se
 
 This means that you have to use a unique secret token as the username.
 
-This token is displayed when you log in. Use it as the username in gPodder configuration.
+This token can be created when you log in. Use it as the username in gPodder configuration. Be warned that this username is replacing your password, so it lowers the security of your account.
 
 ## APIs
 
@@ -146,6 +128,8 @@ This server has been tested so far with:
 * [gPodder](https://gpodder.github.io/) 3.10.17 - Debian (requires a specific token, see above!)
 * [Kasts](https://invent.kde.org/multimedia/kasts) 21.08 - Linux/Windows/Android
 * [PinePods](https://github.com/madeofpendletonwool/PinePods) 0.6.1 - WebServer
+* [Music Assistant](https://www.music-assistant.io/music-providers/gpodder/) (according to their documentation)
+* [Rhythmbox](https://gnome.pages.gitlab.gnome.org/rhythmbox/) 3.5.0 - Linux
 
 Please report if apps work (or not) with other clients.
 
