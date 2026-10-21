@@ -4,41 +4,39 @@ use KD2\Test;
 use KD2\HTTP;
 use KD2\HTMLDocument;
 
-require __DIR__ . '/../../kd2fw/src/lib/KD2/Test.php';
-require __DIR__ . '/../../kd2fw/src/lib/KD2/HTTP.php';
-require __DIR__ . '/../../kd2fw/src/lib/KD2/HTMLDocument.php';
+$framework = getenv('KD2FW_ROOT') ?: __DIR__ . '/../../kd2fw';
+require $framework . '/src/lib/KD2/Test.php';
+require $framework . '/src/lib/KD2/HTTP.php';
+require $framework . '/src/lib/KD2/HTMLDocument.php';
 
-$server = 'localhost:8099';
+$socket = stream_socket_server('tcp://127.0.0.1:0');
+$server = stream_socket_get_name($socket, false);
+fclose($socket);
 $url = 'http://' . $server;
 
-$data_root = __DIR__ . '/data';
-
-if (file_exists($data_root)) {
-	passthru('rm -rf ' . escapeshellarg($data_root));
-}
-
+$data_root = sys_get_temp_dir() . '/opodsync-test-' . bin2hex(random_bytes(8));
 mkdir($data_root);
-//file_put_contents($data_root . '/config.local.php', '<?php namespace OPodSync;');
 
 $root = realpath(__DIR__ . '/../server');
-
-$cmd = sprintf(
-	'DATA_ROOT=%s php -S %s -d variables_order=EGPCS -t %s %s > /dev/null 2>&1 & echo $!',
-	escapeshellarg($data_root),
-	escapeshellarg($server),
-	escapeshellarg($root),
-	escapeshellarg($root . '/index.php')
+$environment = array_replace(getenv(), [
+	'DATA_ROOT' => $data_root,
+	'BASE_URL' => $url . '/',
+]);
+unset($environment['PHP_CLI_SERVER_WORKERS']);
+$process = proc_open(
+	[PHP_BINARY, '-S', $server, '-d', 'variables_order=EGPCS', '-t', $root, $root . '/index.php'],
+	[0 => ['file', '/dev/null', 'r'], 1 => ['file', $data_root . '/server.log', 'a'], 2 => ['file', $data_root . '/server.log', 'a']],
+	$pipes,
+	null,
+	$environment
 );
 
-$pid = shell_exec($cmd);
-
-sleep(1);
-
-declare(ticks = 1);
-
-pcntl_signal(SIGINT, function() use ($pid) {
-	shell_exec('kill ' . $pid);
-	exit;
+pcntl_async_signals(true);
+pcntl_signal(SIGINT, function() {
+	throw new RuntimeException('Tests interrupted');
+});
+pcntl_signal(SIGTERM, function() {
+	throw new RuntimeException('Tests terminated');
 });
 
 $http = new HTTP;
@@ -48,17 +46,64 @@ $list = glob(__DIR__ . '/tests/*.php');
 natcasesort($list);
 
 try {
+	$ready = false;
+	for ($i = 0; $i < 100; $i++) {
+		$connection = @stream_socket_client('tcp://' . $server, $errno, $error, 0.1);
+		if ($connection) {
+			fclose($connection);
+			$ready = true;
+			break;
+		}
+		if (!proc_get_status($process)['running']) {
+			break;
+		}
+		usleep(50000);
+	}
+	Test::assert($ready, 'Test server failed to start');
+
 	foreach ($list as $file) {
 		echo "$file\n";
 		require $file;
 	}
+	echo "All tests passed\n";
+}
+catch (Throwable $e) {
+	fwrite(STDERR, file_get_contents($data_root . '/server.log'));
+	throw $e;
 }
 finally {
-	shell_exec('kill ' . $pid);
+	proc_terminate($process);
+	proc_close($process);
+	removeTestDirectory($data_root);
 }
 
 function dom(string $html) {
 	$doc = new HTMLDocument;
 	$doc->loadHTML($html);
 	return $doc;
+}
+
+function removeTestDirectory(string $path): void {
+	foreach (new FilesystemIterator($path) as $entry) {
+		if ($entry->isDir() && !$entry->isLink()) {
+			removeTestDirectory($entry->getPathname());
+		}
+		else {
+			unlink($entry->getPathname());
+		}
+	}
+	rmdir($path);
+}
+
+function runPHP(string $code, array $environment): array {
+	$process = proc_open(
+		[PHP_BINARY, '-r', $code],
+		[0 => ['file', '/dev/null', 'r'], 1 => ['pipe', 'w'], 2 => ['redirect', 1]],
+		$pipes,
+		null,
+		$environment
+	);
+	$output = stream_get_contents($pipes[1]);
+	fclose($pipes[1]);
+	return [proc_close($process), $output];
 }

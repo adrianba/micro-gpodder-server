@@ -12,7 +12,8 @@ namespace OPodSync;
  * true = Open subscriptions to anyone
  * false = Subscriptions are closed after the first account is created
  *
- * Default: false
+ * Default without configuration: true
+ * This example explicitly closes registration after the first account.
  * @var bool
  */
 const ENABLE_SUBSCRIPTIONS = false;

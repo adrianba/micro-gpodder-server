@@ -25,6 +25,8 @@ CREATE TABLE episodes (
 );
 
 CREATE UNIQUE INDEX episodes_unique ON episodes (feed, media_url);
+CREATE INDEX episodes_media_url ON episodes (media_url);
+CREATE INDEX episodes_feed_pubdate ON episodes (feed, pubdate DESC);
 
 CREATE TABLE users (
 	id INTEGER NOT NULL PRIMARY KEY,
@@ -73,3 +75,5 @@ CREATE TABLE episodes_actions (
 
 CREATE INDEX episodes_idx ON episodes_actions (user, action, changed);
 CREATE INDEX episodes_actions_link ON episodes_actions (episode);
+CREATE INDEX episodes_actions_url ON episodes_actions (url);
+CREATE INDEX episodes_actions_subscription_action ON episodes_actions (subscription, action);

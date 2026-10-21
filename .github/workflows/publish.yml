@@ -1,15 +1,55 @@
 name: Create and publish a Docker image
 
 on:
+  pull_request:
+    branches: [main]
   push:
     branches: [main]
+
+permissions:
+  contents: read
 
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Checkout test-only framework
+        uses: actions/checkout@v4
+        with:
+          repository: kd2org/kd2fw
+          ref: fb6fcd1505683f667250edd86d7787ad4d5a5f40
+          path: .test-framework
+          persist-credentials: false
+
+      - name: Build test runtime
+        run: docker build --target test -t opodsync:test .
+
+      - name: Check PHP syntax
+        run: |
+          docker run --rm --entrypoint sh opodsync:test \
+            -c 'find server test -name "*.php" -print0 | xargs -0 -n1 php -l'
+
+      - name: Run client and regression tests
+        run: |
+          docker run --rm \
+            -v "$PWD/.test-framework:/var/kd2fw:ro" opodsync:test
+
+      - name: Build production image
+        run: docker build -t opodsync:verify .
+
+      - name: Check production container and persistence
+        run: bash test/smoke.sh opodsync:verify
+
   build-and-push-image:
+    needs: verify
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -34,4 +74,9 @@ jobs:
         with:
           context: .
           push: true
-          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.sha }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}

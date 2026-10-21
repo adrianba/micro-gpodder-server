@@ -6,7 +6,8 @@ This is a minimalist podcast synchronization server, for self-hosting your podca
 
 This allows you to keep track of which episodes have been listened to.
 
-Requires PHP 7.4+ and SQLite3 with JSON1 extension.
+The Docker image uses PHP 8.5 on Alpine 3.24 and SQLite3 with JSON support.
+Upstream code requires at least PHP 8.2 syntax; other PHP versions are not tested by this fork.
 
 * Main development happens on Fossil: <https://fossil.kd2.org/opodsync/>
 * Github mirror: <https://github.com/kd2org/opodsync> (PR and issues accepted)
@@ -46,22 +47,126 @@ This should work in most cases. Exceptions are:
 
 When installed, the server will allow to create a first account. Just go to the server URL and you will be able to create an account and login.
 
-After that first account, account creation is disabled by default.
+Account creation remains open by default.
 
-If you want to allow more accounts, you'll have to configure the server (see "Configuration" below).
+Set `ENABLE_SUBSCRIPTIONS` to `false` to close registration after the first account
+(see "Configuration" below). The example configuration explicitly selects this
+closed-registration policy.
 
 ### Docker
+
+This fork publishes `ghcr.io/adrianba/micro-gpodder-server:latest` after its checks
+pass on `main`. A `sha-<full-commit>` tag and OCI source/revision labels identify
+each published revision. For deployments, prefer an immutable image digest.
+
+```sh
+docker run -d --name opodsync -p 8080:8080 \
+  -v opodsync-data:/var/www/server/data \
+  -e BASE_URL=https://podcasts.example.org/ -e ERRORS_SHOW=false \
+  ghcr.io/adrianba/micro-gpodder-server:latest
+```
+
+The image uses PHP's built-in server with two workers. Terminate HTTPS at your
+reverse proxy, forward the `Authorization` header, and set the public URL explicitly.
+`BASE_URL` must end with `/`. `DATA_ROOT` can override the data directory; mount
+persistent storage at the overridden path too. The directory must be writable
+for SQLite, logs, configuration, and compiled templates in `cache/templates`.
+
+The example configuration is `/var/www/config.dist.php` inside the image, outside
+the persistent volume. Copy it only when creating a new configuration:
+
+```sh
+docker exec opodsync sh -c 'test ! -e /var/www/server/data/config.local.php &&
+  cp /var/www/config.dist.php /var/www/server/data/config.local.php'
+```
+
+If you override `DATA_ROOT`, replace the destination above with that path and
+adjust the example's `DATA_ROOT` constant too. Edit the file before restarting.
+Configuration constants take precedence over environment
+variables, including `BASE_URL`. Do not overwrite an existing configuration.
+
+Other community distributions include:
 
  * [billznn/opodsync_dckr](https://hub.docker.com/r/billznn/opodsync_dckr): downloads from oPodSync upstream when building the container (not forking) ([Source](https://github.com/mzannoni/opodsync_dckr))
  * [ganeshlab/opodsync](https://hub.docker.com/r/ganeshlab/opodsync): fork with Dockerfile ([Source](https://github.com/ganeshlab/opodsync))
 
 If these images stop being maintained, see [Docker Hub](https://hub.docker.com/search?q=opodsync) to find other community distribution for Docker.
 
-**Please don't report Docker issues here, this repository is only for software development.**
+Report issues with this fork's image here, not to upstream.
 
 ### Configuration
 
 You can copy the `config.dist.php` to `data/config.local.php`, and edit it to suit your needs.
+
+Configuration files must begin with `<?php` followed by `namespace OPodSync;`.
+For example:
+
+```php
+<?php
+namespace OPodSync;
+
+const BASE_URL = 'https://podcasts.example.org/';
+const ENABLE_SUBSCRIPTIONS = false;
+const ERRORS_SHOW = false;
+const DEBUG_LOG = null;
+```
+
+`ERRORS_SHOW` defaults to `true` upstream; explicitly disable it in production.
+`DEBUG_LOG` controls API logging and replaces the old `DEBUG` constant. Leave it
+disabled unless diagnosing a problem, because API logs may contain credentials.
+
+For a subdirectory installation, set a URL such as
+`https://example.org/podcasts/` and serve the application directory at that prefix,
+including its PHP scripts and static assets. Preserve that prefix when forwarding
+API requests. Merely setting `BASE_URL` does not mount the application at a new
+path. Configure `HTTP_SCHEME=https` behind TLS termination for secure session
+cookies. CLI feed updates also accept the `BASE_URL` environment variable.
+
+### Upgrading this fork from the 2024 version
+
+Before deployment, identify the actual data volume, configuration, public URL,
+proxy prefix/HTTPS settings, and currently deployed image digest. These settings
+cannot be inferred from the repository.
+
+1. Stop all writers, including clients, cron jobs, and application containers.
+   Make a consistent backup of the complete data/config directory, including any
+   SQLite `-wal`, `-shm`, or journal sidecars, and record the old image digest.
+1. Test the new image on a copy of that backup, never the only production copy.
+   Add `namespace OPodSync;` to old configuration files, rename `DEBUG` to
+   `DEBUG_LOG`, and review `config.dist.php`. Global-namespace constants no longer
+   configure the application. Configure registration explicitly if it must stay closed.
+1. Allow the application to apply migrations from schema `20240428` to `20260911`.
+   Verify login, subscriptions, history, public URLs, and client synchronization
+   before allowing production writers. Existing web sessions are invalidated.
+1. Generate a new secret username in the web UI for each account using gPodder
+   desktop and reconfigure those clients. Old password-derived usernames are not
+   retained; normal account passwords are preserved.
+
+To roll back, stop writers again and restore **both** the prior image digest and
+its matching pre-upgrade data/config backup. Running old code against the migrated
+database is not a supported rollback. Writes made after the backup will need
+separate recovery. Publishing an image does not deploy or migrate any live instance.
+
+### Development checks
+
+The production image contains no test framework. Client tests use a separate
+test target and a pinned, test-only sibling checkout:
+
+```sh
+git clone https://github.com/kd2org/kd2fw.git ../kd2fw
+git -C ../kd2fw checkout fb6fcd1505683f667250edd86d7787ad4d5a5f40
+docker build --target test -t opodsync:test .
+docker run --rm --entrypoint sh opodsync:test \
+  -c 'find server test -name "*.php" -print0 | xargs -0 -n1 php -l'
+docker run --rm -v "$(realpath ../kd2fw):/var/kd2fw:ro" opodsync:test
+docker build -t opodsync:verify .
+bash test/smoke.sh opodsync:verify
+```
+
+The PHP runner creates disposable data directories and owns/cleans up its test
+servers. The container smoke check uses disposable volumes and verifies both the
+default data path and a `DATA_ROOT` override across restarts. Do not use the legacy
+`test.sh` against a deployment; it moves and removes database files.
 
 ### Fetching and updating feeds metadata
 
@@ -153,5 +258,6 @@ GNU AGPLv3
 
 ## Fork
 
-Includes GitHub action to build Docker image.
-
+Retains Docker/GHCR distribution alongside the complete upstream application.
+Pull requests run verification without publishing; main pushes publish only after
+verification succeeds.

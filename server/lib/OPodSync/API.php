@@ -574,7 +574,7 @@ class API
 		$timestamp = time();
 		$episodes = [];
 		$devices = [];
-		$st = $db->prepare('INSERT INTO episodes_actions (user, subscription, url, changed, action, data, episode) VALUES (:user, :subscription, :url, :changed, :action, :data, :episode);');
+		$st = $db->prepare('INSERT INTO episodes_actions (user, subscription, url, changed, action, data, episode, device) VALUES (:user, :subscription, :url, :changed, :action, :data, :episode, :device);');
 
 		foreach ($input as $action) {
 			if (!isset($action->podcast, $action->action, $action->episode)) {
