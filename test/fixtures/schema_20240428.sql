@@ -1,3 +1,4 @@
+-- Schema from fork commit 26609be, before the upstream integration.
 CREATE TABLE feeds (
 	id INTEGER NOT NULL PRIMARY KEY,
 	feed_url TEXT NOT NULL,
@@ -9,7 +10,6 @@ CREATE TABLE feeds (
 	pubdate TEXT NULL DEFAULT CURRENT_TIMESTAMP CHECK (pubdate IS NULL OR datetime(pubdate) = pubdate),
 	last_fetch INTEGER NOT NULL
 );
-
 CREATE UNIQUE INDEX feed_url ON feeds (feed_url);
 
 CREATE TABLE episodes (
@@ -23,7 +23,6 @@ CREATE TABLE episodes (
 	description TEXT NULL,
 	pubdate TEXT NULL DEFAULT CURRENT_TIMESTAMP CHECK (pubdate IS NULL OR datetime(pubdate) = pubdate)
 );
-
 CREATE UNIQUE INDEX episodes_unique ON episodes (feed, media_url);
 
 CREATE TABLE users (
@@ -31,7 +30,6 @@ CREATE TABLE users (
 	name TEXT NOT NULL,
 	password TEXT NOT NULL
 );
-
 CREATE UNIQUE INDEX users_name ON users (name);
 
 CREATE TABLE devices (
@@ -41,7 +39,6 @@ CREATE TABLE devices (
 	name TEXT NULL,
 	data TEXT
 );
-
 CREATE UNIQUE INDEX deviceid ON devices (deviceid, user);
 
 CREATE TABLE subscriptions (
@@ -53,7 +50,6 @@ CREATE TABLE subscriptions (
 	changed INTEGER NOT NULL,
 	data TEXT
 );
-
 CREATE UNIQUE INDEX subscription_url ON subscriptions (url, user);
 CREATE INDEX subscription_feed ON subscriptions (feed);
 
@@ -68,8 +64,6 @@ CREATE TABLE episodes_actions (
 	action TEXT NOT NULL,
 	data TEXT
 );
-
 CREATE INDEX episodes_idx ON episodes_actions (user, action, changed);
 CREATE INDEX episodes_actions_link ON episodes_actions (episode);
-
 PRAGMA user_version = 20240428;

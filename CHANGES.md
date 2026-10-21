@@ -1,0 +1,68 @@
+## 0.6.0
+
+* New: Add in-browser player that remembers position (thanks @debenore)
+* New: display play progress in list of episodes
+* New: Use relative date for listing last updated feeds
+* Move list of episodes actions to a separate page
+* Fix issues with feed updates reaching max_execution_time (thanks @MartinCa)
+* Fix: durations were wrongly stored when they were in the HH:MM:SS format in feeds
+* Fix: all feeds were always updated, now they're only updated if they have new actions
+* Fix: set timeout for fetching a feed to 5 seconds (should be plenty enough)
+
+## 0.5.3
+
+* Fix: get around wrong use of NextCloud auth by YourPods client (thanks @kaiwei)
+
+## 0.5.2
+
+* Fix: error when addin a new subscription (GH-86)
+
+## 0.5.1 (16 Januay 2026)
+
+* Add support for adding new subscriptions from the web UI (thanks [@nebulade](https://github.com/kd2org/opodsync/pull/85))
+
+## 0.5.0 (11 December 2025)
+
+* Add URL of instance on homepage, with copy button
+* Add support for being used as an external app inside KaraDAV
+
+## 0.4.7 (29 November 2025)
+
+* Add some client tests (still incomplete)
+* Refactor API error and route handling
+
+## 0.4.6 (28 November 2025)
+
+* Fix register button was hidden when no user existed
+* Fix login after registration
+* Fix various warnings for PHP 8.5 compatibility (please report any issue)
+
+## 0.4.5 (November 2025)
+
+* Implement various small cosmetic PRs
+
+## 0.4.4
+
+* Fix login.php redirect (thanks @mx1up)
+
+## 0.4.3
+
+* Fix GPodder token parsing (thanks @sezuan)
+
+## 0.4.2
+
+* Fix DATA_ROOT env
+
+## 0.4.1
+
+* Fix CSS loading issue with php-cli webserver
+* Fix session_destroy call during migration
+
+## 0.4.0
+
+Warning: If you had an old `config.local.php` from pre-0.4 version, it will not work anymore (the namespace has changed). You should edit it to suit the new format, see `config.dist.php` for an example.
+
+* Refactor code of HTML display to use Smartyer templates
+* Add more configuration constants
+* Allow to enable/disable the secret gpodder username
+* Add feed title, description and website URL to OPML (if metadata fetching was done)
